@@ -1,23 +1,31 @@
 import numpy as np
 import cv2
-import math
 
 def distance_between(a, b):
     return (((b[0] - a[0]) ** 2) + ((b[1] - b[0]) ** 2)) ** 0.5
 
-def angle_between(a, b, t):
+def angle_between(v1, v2):
     # h = distance_between(a, b)
     # c = abs(a[0]-a[0])
     # return np.arccos(c/h)
-    angle = math.atan2(b[1] - a[1], b[0] - a[0])
-    if t == 'degrees':
-        return math.degrees(angle)
 
-    return angle
+    dot_product = np.dot(v1, v2)
+    mag_v1 = np.linalg.norm(v1)
+    mag_v2 = np.linalg.norm(v2)
 
-def draw_angled_rec(a, b, c, d, width, height, img):
-    center = (int(width / 2) + a[0], int(height / 2) + a[1])
+    a = dot_product/(mag_v1*mag_v2)
+    angle = np.arccos(a)
 
-    # center_x = (center[0] - b[0], center[1] - b[1])
-    cv2.line(img, center, a, (0, 0, 255), 2)
-    # print("center", center, a)
+    # angle = math.atan2(v2[1] - v1[1], v2[0] - v1[0])
+    print("ANTES Angle between", v1, v2, angle)
+    angle = np.degrees(angle)
+    print("DEPOIS Angle between", v1, v2, angle)
+
+    return -angle
+
+def rotate_image(image, angle):
+    height, width = image.shape[:2]
+    image_center = tuple(np.array(image.shape[1::-1]) / 2)
+    rot_mat = cv2.getRotationMatrix2D(image_center, angle, 1.0)
+    result = cv2.warpAffine(image, M=rot_mat, dsize=(width, height))
+    return result
