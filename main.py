@@ -37,9 +37,7 @@ while True:
 
     perf_stats = model.getPerfProfile()
 
-    # print('Inference time, ms: %.2f' % (perf_stats[0] / cv2.getTickFrequency() * 1000))
     new_img = None
-    new_img1 = None
 
     for i in range(0, detections.shape[2]):
         confidence = detections[0, 0, i, 2]
@@ -108,7 +106,6 @@ while True:
                 c = euclidean_distance(right_eye_center, aux)
 
                 cos_a = (b * b + c * c - a * a) / (2 * b * c)
-                print("cos(a) = ", cos_a)
 
                 angle = np.degrees(np.arccos(cos_a))
 
@@ -122,13 +119,11 @@ while True:
 
                 # Cortar a imagem
                 new_img = Image.fromarray(img)
-                new_img = np.array(new_img.rotate(direction * angle))[start_y:end_y, start_x:end_x]
+                new_img = np.array(new_img.rotate(direction * angle))#[start_y:end_y, start_x:end_x]
 
     if new_img is not None:
         cv2.imshow('rotated_img', new_img)
 
-    if new_img1 is not None:
-        cv2.imshow('rotated_img1', new_img1)
     cv2.imshow('img', img)
     k = cv2.waitKey(30) & 0xff
     if k == 27:
