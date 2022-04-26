@@ -3,7 +3,7 @@ import time
 import numpy as np
 from PIL import Image
 from math import cos, sin
-from utils import angle_between, rotate_image, euclidean_distance
+from utils import euclidean_distance, get_left_and_right_eyes, get_angle, rotate_point, resize_image
 
 prototxt = 'models/deploy.prototxt.txt'
 caffemodel = 'models/res10_300x300_ssd_iter_140000.caffemodel'
@@ -22,6 +22,8 @@ model.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 cap = cv2.VideoCapture(0)
 
 eye_cascade = cv2.CascadeClassifier("haarcascade_eye.xml")
+
+rotated = None
 
 while True:
     ret, img = cap.read()
@@ -46,7 +48,7 @@ while True:
             box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
             (start_x, start_y, end_x, end_y) = box.astype('int')
 
-            text = "{:.2f}%".format(confidence*100)
+            text = "{:.2f}%".format(confidence * 100)
 
             new_img_g = gray[start_y:end_y, start_x:end_x]
             new_img_c = img[start_y:end_y, start_x:end_x]
@@ -63,66 +65,65 @@ while True:
                     eye2 = (ex, ey, ew, eh)
                 else:
                     break
-                cv2.rectangle(new_img_c, (ex, ey), (ex + ew, ey + eh), (0, 255, 0), 2)
                 eyes_coordinates.append((ex, ey, ew, eh))
                 count_two_eyes += 1
 
-
-            # Draw a line between the eyes
             if count_two_eyes >= 2:
 
                 # Calculate left and right eyes
-                left_eye = None
-                right_eye = None
+                left_eye, left_eye_center, right_eye, right_eye_center = get_left_and_right_eyes(eyes_coordinates)
 
-                if eyes_coordinates[0][0] < eyes_coordinates[1][0]:
-                    left_eye = eyes_coordinates[0]
-                    right_eye = eyes_coordinates[1]
-                else:
-                    left_eye = eyes_coordinates[1]
-                    right_eye = eyes_coordinates[0]
+                left_eye_x_c = left_eye_center[0]; left_eye_y_c = left_eye_center[1]
+                right_eye_x_c = right_eye_center[0]; right_eye_y_c = right_eye_center[1]
 
-                left_eye_center = (int(left_eye[0] + (left_eye[2] / 2)), int(left_eye[1] + (left_eye[3] / 2)))
-                left_eye_x = left_eye_center[0]
-                left_eye_y = left_eye_center[1]
+                # Draw a line between the eyes
+                # cv2.line(new_img_c, right_eye_center, left_eye_center, (67, 67, 67), 2)
 
-                right_eye_center = (int(right_eye[0] + (right_eye[2] / 2)), int(right_eye[1] + (right_eye[3] / 2)))
-                right_eye_x = right_eye_center[0]
-                right_eye_y = right_eye_center[1]
+                # Get angle between eyes
+                angle, d = get_angle(left_eye_center, right_eye_center)
 
-                cv2.circle(new_img_c, left_eye_center, 2, (255, 0, 0), 2)
-                cv2.circle(new_img_c, right_eye_center, 2, (255, 0, 0), 2)
-                cv2.line(new_img_c, right_eye_center, left_eye_center, (67, 67, 67), 2)
+                face_center = (start_x + euclidean_distance((start_x, 0), (end_x, 0)) / 2,
+                               start_y + euclidean_distance((start_y, 0), (end_y, 0)) / 2)
 
-                if left_eye_y < right_eye_y:
-                    aux = (right_eye_x, left_eye_y)
-                    direction = -1
-                else:
-                    aux = (left_eye_x, right_eye_y)
-                    direction = 1
+                scale_center = (w / 2, h / 2)
 
-                a = euclidean_distance(left_eye_center, aux)
-                b = euclidean_distance(right_eye_center, left_eye_center)
-                c = euclidean_distance(right_eye_center, aux)
+                # Rotation matrix definition
+                rotation_matrix = cv2.getRotationMatrix2D(scale_center, -d * angle, 1.)
 
-                cos_a = (b * b + c * c - a * a) / (2 * b * c)
+                # Rotated Image with the angle
+                rotated = cv2.warpAffine(img, rotation_matrix, (w, h))
 
-                angle = np.degrees(np.arccos(cos_a))
+                face_center_rotated = rotate_point(face_center, rotation_matrix)
 
-                y = start_y - 10 if start_y - 10 > 10 else start_y + 10
+                if right_eye is not None and left_eye is not None:
+                    new_left_eye = rotate_point((start_x + left_eye_x_c, start_y + left_eye_y_c), rotation_matrix)
 
-                cv2.rectangle(img, (start_x, start_y), (end_x, end_y), (0, 0, 255), 2)
-                cv2.putText(img, text, (start_x, y), cv2.FONT_HERSHEY_SIMPLEX, .45, (0, 0, 255), 3)
+                    new_right_eye = rotate_point((start_x + right_eye_x_c, start_y + right_eye_y_c), rotation_matrix)
 
-                if direction == -1:
-                    angle = 90 - angle
+                distance_between_eyes = euclidean_distance(new_left_eye, new_right_eye)
+                d = 15
+                scale = d/distance_between_eyes
+                rotated = resize_image(rotated, scale_factor=scale)
 
-                # Cortar a imagem
-                new_img = Image.fromarray(img)
-                new_img = np.array(new_img.rotate(direction * angle))#[start_y:end_y, start_x:end_x]
+                # print("distance", distance_between_eyes)
+                new_left_eye = new_left_eye*scale
+                new_right_eye = new_right_eye*scale
 
-    if new_img is not None:
-        cv2.imshow('rotated_img', new_img)
+                face_start_x = int(new_left_eye[0]) - 16
+                face_start_y = int(new_left_eye[1]) - 24
+                face_end_x = (int(new_left_eye[0]) - 16) + 46
+                face_end_y = (int(new_left_eye[1]) - 24) + 56
+
+                # cv2.rectangle(rotated, (face_start_x, face_start_y), (face_end_x, face_end_y), (0, 0, 255), 1)
+                rotated = rotated[face_start_y:face_end_y, face_start_x:face_end_x]
+
+                # Show rotated points
+                cv2.circle(rotated, face_center_rotated, 2, (0, 0, 255), 2)
+                cv2.circle(rotated, new_left_eye.astype(int), 2, (0, 255, 0), 2)
+                cv2.circle(rotated, new_right_eye.astype(int), 2, (0, 255, 0), 2)
+
+    if rotated is not None:
+        cv2.imshow('rotated_img', rotated)
 
     cv2.imshow('img', img)
     k = cv2.waitKey(30) & 0xff

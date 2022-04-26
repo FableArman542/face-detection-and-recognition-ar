@@ -80,3 +80,7 @@ cv2.waitKey(0)
 # closing all open windows
 cv2.destroyAllWindows()
 
+# Cortar a imagem
+
+# new_img = Image.fromarray(img)
+# new_img = np.array(new_img.rotate(-d * angle))#[start_y:end_y, start_x:end_x]
