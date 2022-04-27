@@ -3,16 +3,11 @@ import time
 import numpy as np
 from PIL import Image
 from math import cos, sin
+# import keyboard
 from utils import euclidean_distance, get_left_and_right_eyes, get_angle, rotate_point, resize_image
 
 prototxt = 'models/deploy.prototxt.txt'
 caffemodel = 'models/res10_300x300_ssd_iter_140000.caffemodel'
-
-# with open(prototxt, 'r') as f:
-#     class_names = f.read().split('\n')
-# print(class_names)
-# colors = np.random.uniform(0, 255, size=(len(class_names), 3))
-
 
 model = cv2.dnn.readNetFromCaffe(prototxt, caffemodel)
 
@@ -24,7 +19,7 @@ cap = cv2.VideoCapture(0)
 eye_cascade = cv2.CascadeClassifier("haarcascade_eye.xml")
 
 rotated = None
-
+c=0
 while True:
     ret, img = cap.read()
     h, w, channels = img.shape
@@ -52,6 +47,7 @@ while True:
 
             new_img_g = gray[start_y:end_y, start_x:end_x]
             new_img_c = img[start_y:end_y, start_x:end_x]
+
             eyes = eye_cascade.detectMultiScale(new_img_g, 1.3, 5)
 
             count_two_eyes = 0
@@ -118,14 +114,24 @@ while True:
                 rotated = rotated[face_start_y:face_end_y, face_start_x:face_end_x]
 
                 # Show rotated points
-                cv2.circle(rotated, face_center_rotated, 2, (0, 0, 255), 2)
-                cv2.circle(rotated, new_left_eye.astype(int), 2, (0, 255, 0), 2)
-                cv2.circle(rotated, new_right_eye.astype(int), 2, (0, 255, 0), 2)
+                # cv2.circle(rotated, face_center_rotated, 2, (0, 0, 255), 2)
+                # cv2.circle(rotated, new_left_eye.astype(int), 2, (0, 255, 0), 2)
+                # cv2.circle(rotated, new_right_eye.astype(int), 2, (0, 255, 0), 2)
 
+    do=False
+    # if keyboard.is_pressed("b"):
+    #     print("PRESSED")
+        # do=True
     if rotated is not None:
         cv2.imshow('rotated_img', rotated)
-
+        # if do:
+        #     if rotated.shape[0]==56 and rotated.shape[1]==46:
+        #         print("HEREEE")
+        #         cv2.imwrite("resources/eu/face"+str(c)+".jpg", rotated)
+        #         c+=1
+        #         do=False
     cv2.imshow('img', img)
+
     k = cv2.waitKey(30) & 0xff
     if k == 27:
         break

@@ -1,5 +1,15 @@
 import numpy as np
 import cv2
+import os
+
+
+def load_images_from_folder(folder):
+    images = []
+    for filename in os.listdir(folder):
+        img = cv2.imread(os.path.join(folder, filename), cv2.IMREAD_GRAYSCALE)
+        if img is not None:
+            images.append(img)
+    return np.asarray(images)
 
 
 def distance_between(a, b):
@@ -57,6 +67,7 @@ def get_left_and_right_eyes(eyes_coordinates):
 
 def rotate_point(point, rotation_matrix):
     return np.matmul(rotation_matrix, np.array([point[0], point[1], 1])).astype(int)
+
 
 def resize_image(img, scale_factor):
     width = int(img.shape[1] * scale_factor)

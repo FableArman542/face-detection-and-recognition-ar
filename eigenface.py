@@ -2,70 +2,106 @@ import os
 import cv2
 import heapq
 import numpy as np
+import scipy
+from scipy.interpolate import interp1d
+from utils import load_images_from_folder
 
-def load_images_from_folder(folder):
-    images = []
-    for filename in os.listdir(folder):
-        img = cv2.imread(os.path.join(folder, filename), cv2.IMREAD_GRAYSCALE)
-        if img is not None:
-            images.append(img)
-    return np.asarray(images)
 
-def calculate_mean_face(images, w, h, to_plot=False):
-    mean_face = np.mean(images, axis=0).astype(np.uint8)
-    if to_plot:
-        cv2.imshow('Mean Face', mean_face)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-    return np.reshape(mean_face, (w * h))
+class Eigenfaces:
 
-images = load_images_from_folder("resources")
-w = images.shape[1]
-h = images.shape[2]
-a = [[2, 3, 4],
-     [1, 2, 3]]
+    @staticmethod
+    def reshape_data(data):
+        return np.reshape(data, (data.shape[0], data.shape[1] * data.shape[2]))
 
-dataset = np.reshape(images, (images.shape[0], w * h))
-N=dataset.shape[0]
-n = dataset.shape[1]
+    def __init__(self, images):
+        self.__w = 56
+        self.__h = 46
+        self.__dataset = images
+        print(self.__dataset.shape)
 
-mean_face = calculate_mean_face(images, w, h)
+    def __calculate_mean_face(self, images, w, h, to_plot=False):
+        mean_face = np.mean(images, axis=0).astype(np.uint8)
+        cv2.imwrite("eigenfaces_output/mean_face.jpg", np.reshape(mean_face, (w, h)))
+        if to_plot:
+            cv2.imshow('Mean Face', np.reshape(mean_face, (self.__w, self.__h)))
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+        return mean_face
 
-A = np.array([face - mean_face for face in dataset])
-A = np.reshape(A, (n, N))
-print("A shape:", A.shape)
+    def calculate_eigenfaces(self, m, debug=False):
 
-m = 5
-R = np.dot(A.T, A)
-print("R shape:", R.shape)
-S = np.dot(A, A.T)
-print("S shape:", S.shape)
+        N = self.__dataset.shape[0]
+        n = self.__dataset.shape[1]
 
-R_mag = np.array([np.linalg.norm(v) for v in R])
+        self.__mean_face = np.mean(self.__dataset, axis=0).astype(np.uint8)
+        A = self.__dataset - self.__mean_face
+        A = A.T
+        if debug: print("A shape:", A.shape)
 
-# indexes = heapq.nlargest(m, range(len(R_mag)), R_mag.__getitem__)
-# V = np.array([R[i] for i in indexes])
-# V = np.reshape(V, (N, m))
-_, V = np.linalg.eig(R)
+        R = np.dot(A.T, A)
+        if debug: print("R shape:", R.shape)
 
-V_mag = np.array([np.linalg.norm(v) for v in V])
-indexes = heapq.nlargest(m, range(len(V)), V_mag.__getitem__)
-V = np.array([V[i] for i in indexes])
-V = np.reshape(V, (N, m))
-print("V shape:", V.shape)
+        vw, V = np.linalg.eig(R)
+        print("OLD V SHAPE", V.shape)
 
-W = np.dot(A, V)
-W = np.array([w/np.linalg.norm(w) for w in W])
+        indexes = np.argsort(vw)[::-1][:m]
+        newV = np.array([])
+        for i in V:
+            newV = np.append(newV, np.array([i[j] for j in indexes]))
 
-print("W shape:", W.shape)
+        V = np.reshape(newV, (N, m))
+        if debug: print("V shape:", V.shape)
 
-y = W.T*(dataset[0] - mean_face)
+        self.__W = np.matmul(A, V)
+        if debug: print("W shape:", self.__W.shape)
+        print("W Nao Normalizado")
+        print(self.__W)
+        print(self.__W.shape)
+        self.__W = np.array([w / np.linalg.norm(w) for w in self.__W])
 
-for i in y:
-    cv2.imshow('Mean Face', np.reshape(i, (w, h)).astype(np.uint8))
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+        print(self.__W.shape)
+        print(np.linalg.norm(self.__W, axis=0))
+        # print("W Normalizado")
+        # print(self.__W)
+        # print("W Transposto")
+        # print(self.__W.T)
 
-print()
-print(y)
-print("Y shape:", y.shape)
+        print("MATRIZ IDENTIDADE")
+        print("dot(W.T, W)")
+        help = np.dot(self.__W.T, self.__W)
+        print(help[0][1])
+        print(help[1][2])
+        # for i in help:
+        #     print(i)
+
+        return self.__W
+
+    def display_eigenfaces(self):
+        print(self.__W.shape)
+        cv2.imshow('Mean Face', np.reshape(self.__mean_face, (self.__w, self.__h)))
+
+        for i in range(self.__W.shape[1]):
+            ajuda = self.__W[:, i]
+            maximum = max(ajuda)
+            minimum = min(ajuda)
+            m = interp1d([minimum, maximum], [0, 255])
+            for j in range(len(ajuda)):
+                ajuda[j] = m(ajuda[j])
+            cv2.imshow('Test', np.reshape(ajuda, (self.__w, self.__h)).astype(np.uint8))
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+    def get_vector(self):
+        y = np.dot(self.__W.T, (self.__dataset[0] - self.__mean_face))
+        print(y.shape)
+        return y
+
+
+if __name__ == "__main__":
+    folder = "resources/arman"
+    images = load_images_from_folder(folder)
+
+    e = Eigenfaces(Eigenfaces.reshape_data(images))
+    Wpca = e.calculate_eigenfaces(5, debug=True)
+    # e.display_eigenfaces()
+    # print(e.get_vector())
