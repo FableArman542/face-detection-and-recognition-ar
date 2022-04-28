@@ -9,15 +9,10 @@ from utils import load_images_from_folder
 
 class Eigenfaces:
 
-    @staticmethod
-    def reshape_data(data):
-        return np.reshape(data, (data.shape[0], data.shape[1] * data.shape[2]))
-
     def __init__(self, images):
         self.__w = 56
         self.__h = 46
         self.__dataset = images
-        print(self.__dataset.shape)
 
     def __calculate_mean_face(self, images, w, h, to_plot=False):
         mean_face = np.mean(images, axis=0).astype(np.uint8)
@@ -28,21 +23,23 @@ class Eigenfaces:
             cv2.destroyAllWindows()
         return mean_face
 
-    def calculate_eigenfaces(self, m, debug=False):
+    def calculate(self, m, debug=False):
 
         N = self.__dataset.shape[0]
         n = self.__dataset.shape[1]
 
-        self.__mean_face = np.mean(self.__dataset, axis=0).astype(np.uint8)
+        self.__mean_face = np.mean(self.__dataset, axis=0)
         A = self.__dataset - self.__mean_face
         A = A.T
+
         if debug: print("A shape:", A.shape)
 
         R = np.dot(A.T, A)
         if debug: print("R shape:", R.shape)
 
         vw, V = np.linalg.eig(R)
-        print("OLD V SHAPE", V.shape)
+
+        assert m < N-1, "m has to be less than N-1"
 
         indexes = np.argsort(vw)[::-1][:m]
         newV = np.array([])
@@ -54,30 +51,11 @@ class Eigenfaces:
 
         self.__W = np.matmul(A, V)
         if debug: print("W shape:", self.__W.shape)
-        print("W Nao Normalizado")
-        print(self.__W)
-        print(self.__W.shape)
-        self.__W = np.array([w / np.linalg.norm(w) for w in self.__W])
-
-        print(self.__W.shape)
-        print(np.linalg.norm(self.__W, axis=0))
-        # print("W Normalizado")
-        # print(self.__W)
-        # print("W Transposto")
-        # print(self.__W.T)
-
-        print("MATRIZ IDENTIDADE")
-        print("dot(W.T, W)")
-        help = np.dot(self.__W.T, self.__W)
-        print(help[0][1])
-        print(help[1][2])
-        # for i in help:
-        #     print(i)
+        self.__W = self.__W/np.linalg.norm(self.__W, axis=0)
 
         return self.__W
 
     def display_eigenfaces(self):
-        print(self.__W.shape)
         cv2.imshow('Mean Face', np.reshape(self.__mean_face, (self.__w, self.__h)))
 
         for i in range(self.__W.shape[1]):
@@ -91,17 +69,21 @@ class Eigenfaces:
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
-    def get_vector(self):
-        y = np.dot(self.__W.T, (self.__dataset[0] - self.__mean_face))
-        print(y.shape)
+    def get_vector(self, image):
+        y = np.dot(self.__W.T, (image - self.__mean_face))
         return y
 
 
 if __name__ == "__main__":
-    folder = "resources/arman"
+    folder = "resources/prof"
     images = load_images_from_folder(folder)
+    images = np.reshape(images, (images.shape[0], images.shape[1] * images.shape[2]))
 
-    e = Eigenfaces(Eigenfaces.reshape_data(images))
-    Wpca = e.calculate_eigenfaces(5, debug=True)
+    e = Eigenfaces(images)
+    W = e.calculate(5, debug=True)
+
+    print("MATRIZ IDENTIDADE")
+    print("dot(W.T, W)")
+    print(np.dot(W.T, W))
+
     # e.display_eigenfaces()
-    # print(e.get_vector())

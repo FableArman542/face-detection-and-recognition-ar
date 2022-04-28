@@ -5,6 +5,8 @@ from PIL import Image
 from math import cos, sin
 # import keyboard
 from utils import euclidean_distance, get_left_and_right_eyes, get_angle, rotate_point, resize_image
+from eigenface import Eigenfaces
+from NNClassifier import Classifier
 
 prototxt = 'models/deploy.prototxt.txt'
 caffemodel = 'models/res10_300x300_ssd_iter_140000.caffemodel'
@@ -17,6 +19,8 @@ model.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 cap = cv2.VideoCapture(0)
 
 eye_cascade = cv2.CascadeClassifier("haarcascade_eye.xml")
+
+classifier = Classifier(m=10, algorithm='fischer')
 
 rotated = None
 c=0
@@ -112,7 +116,11 @@ while True:
 
                 # cv2.rectangle(rotated, (face_start_x, face_start_y), (face_end_x, face_end_y), (0, 0, 255), 1)
                 rotated = rotated[face_start_y:face_end_y, face_start_x:face_end_x]
-
+                if rotated.shape[0] == 56 and rotated.shape[1] == 46:
+                    new_rotated = cv2.cvtColor(rotated, cv2.COLOR_BGR2GRAY)
+                    new_rotated = np.reshape(new_rotated, (56 * 46))
+                    vector = classifier.get_vector(new_rotated)
+                    classifier.predict(vector)
                 # Show rotated points
                 # cv2.circle(rotated, face_center_rotated, 2, (0, 0, 255), 2)
                 # cv2.circle(rotated, new_left_eye.astype(int), 2, (0, 255, 0), 2)
