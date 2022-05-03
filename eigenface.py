@@ -3,8 +3,9 @@ import cv2
 import heapq
 import numpy as np
 import scipy
+import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
-from utils import load_images_from_folder
+from utils import load_images_from_folder, load_images_from_folders
 
 
 class Eigenfaces:
@@ -13,15 +14,6 @@ class Eigenfaces:
         self.__w = 56
         self.__h = 46
         self.__dataset = images
-
-    def __calculate_mean_face(self, images, w, h, to_plot=False):
-        mean_face = np.mean(images, axis=0).astype(np.uint8)
-        cv2.imwrite("eigenfaces_output/mean_face.jpg", np.reshape(mean_face, (w, h)))
-        if to_plot:
-            cv2.imshow('Mean Face', np.reshape(mean_face, (self.__w, self.__h)))
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
-        return mean_face
 
     def calculate(self, m, debug=False):
 
@@ -42,48 +34,81 @@ class Eigenfaces:
         assert m < N-1, "m has to be less than N-1"
 
         indexes = np.argsort(vw)[::-1][:m]
-        newV = np.array([])
-        for i in V:
-            newV = np.append(newV, np.array([i[j] for j in indexes]))
-
-        V = np.reshape(newV, (N, m))
+        V = V[:, indexes]
         if debug: print("V shape:", V.shape)
 
-        self.__W = np.matmul(A, V)
+        self.__W = np.dot(A, V)
         if debug: print("W shape:", self.__W.shape)
         self.__W = self.__W/np.linalg.norm(self.__W, axis=0)
 
         return self.__W
 
     def display_eigenfaces(self):
-        cv2.imshow('Mean Face', np.reshape(self.__mean_face, (self.__w, self.__h)))
-
+        plt.title("Mean Face")
+        plt.imshow(np.reshape(self.__mean_face, (self.__w, self.__h)), cmap='gray')
+        plt.show()
         for i in range(self.__W.shape[1]):
-            ajuda = self.__W[:, i]
-            maximum = max(ajuda)
-            minimum = min(ajuda)
+            aux = self.__W[:, i]
+            maximum = max(aux)
+            minimum = min(aux)
             m = interp1d([minimum, maximum], [0, 255])
-            for j in range(len(ajuda)):
-                ajuda[j] = m(ajuda[j])
-            cv2.imshow('Test', np.reshape(ajuda, (self.__w, self.__h)).astype(np.uint8))
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
+            for j in range(len(aux)):
+                aux[j] = m(aux[j])
+            plt.imshow(np.reshape(aux, (self.__w, self.__h)), cmap='gray')
+            plt.show()
+            # cv2.waitKey(0)
+            # cv2.destroyAllWindows()
 
     def get_vector(self, image):
         y = np.dot(self.__W.T, (image - self.__mean_face))
         return y
 
+    def reconstruct(self, vector):
+        image = np.dot(self.__W, vector) + self.__mean_face
+        return image
+
 
 if __name__ == "__main__":
-    folder = "resources/prof"
-    images = load_images_from_folder(folder)
+
+    main_folder = "resources"
+    folder_arman = main_folder + "/arman"
+    folder_prof = main_folder + "/prof"
+    folder_joao = main_folder + "/joao"
+    folder_carlos = main_folder + "/carlos"
+
+    images = load_images_from_folders([folder_arman, folder_prof, folder_joao, folder_carlos])
     images = np.reshape(images, (images.shape[0], images.shape[1] * images.shape[2]))
-
+    print(images.shape)
     e = Eigenfaces(images)
-    W = e.calculate(5, debug=True)
+    W = e.calculate(20, debug=True)
 
-    print("MATRIZ IDENTIDADE")
-    print("dot(W.T, W)")
-    print(np.dot(W.T, W))
+    # print("Multiplicação de W transposto com W")
+    # print(np.dot(W.T, W))
 
     # e.display_eigenfaces()
+
+    vector = e.get_vector(images[0])
+    reconstructed_image = e.reconstruct(vector)
+    reconstructed_image = np.reshape(reconstructed_image, (56, 46))
+    error_face = images[0].reshape(56, 46) - reconstructed_image
+
+    # print("Multiplicação do face de erro com a face original")
+    # print(np.dot(np.reshape(error_face, (56*46)), np.reshape(images[0], (56*46))))
+
+    # plt.imshow(images[0].reshape(56, 46), cmap='gray')
+    # plt.axis('off')
+    # plt.show()
+    plt.imshow(reconstructed_image, cmap='gray')
+    plt.axis('off')
+    plt.show()
+    plt.imshow(error_face, cmap='gray')
+    plt.axis('off')
+    plt.show()
+
+    # cv2.imshow('asd', reconstructed_image)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    # cv2.imshow('Reconstructed Error', error_face)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
